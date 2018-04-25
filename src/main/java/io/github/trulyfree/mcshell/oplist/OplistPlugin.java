@@ -25,7 +25,7 @@ import java.util.concurrent.atomic.AtomicReference;
         manager = CommandManager.class,
         dependsOn = {ConfigurationPlugin.class})
 public final class OplistPlugin implements ConfiguredShellPlugin<OplistConfig> {
-    private final @NonNull @NotNull OplistConfig oplistConfig;
+    private final @NonNull @NotNull AtomicReference<OplistConfig> oplistConfig = new AtomicReference<>();
     private final @NonNull @NotNull List<Oplist.OplistEntry> oplist;
 
     public OplistPlugin(final PluginManager<? super ShellPlugin> pluginManager) {
@@ -34,14 +34,19 @@ public final class OplistPlugin implements ConfiguredShellPlugin<OplistConfig> {
                 ConfigurationPlugin.class,
                 configurationPlugin -> {
                     try {
-                        oplistConfigAtomicReference.set(configurationPlugin.getConfig(OplistPlugin.this));
+                        oplistConfig.set(configurationPlugin.getConfig(OplistPlugin.this));
                     } catch (FileNotFoundException e) {
+                        oplistConfig.set(new OplistConfig("/path/to/ops.json"));
+                        try {
+                            configurationPlugin.saveConfig(this);
+                        } catch (IOException e1) {
+                            e1.printStackTrace();
+                        }
                         e.printStackTrace();
                     }
                 }
         );
-        oplistConfig = oplistConfigAtomicReference.get();
-        File oplistFile = new File(oplistConfig.getOplistFile());
+        File oplistFile = new File(oplistConfig.get().getOplistFile());
         if (!oplistFile.exists() || !oplistFile.canRead()) {
             throw new IllegalArgumentException("Oplist config must define a valid path to an oplist file.");
         }
@@ -66,7 +71,7 @@ public final class OplistPlugin implements ConfiguredShellPlugin<OplistConfig> {
     @NotNull
     @Override
     public OplistConfig getConfig() {
-        return oplistConfig;
+        return oplistConfig.get();
     }
 
     @NonNull
